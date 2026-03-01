@@ -1,0 +1,26 @@
+{
+  "name": "spirit-stadium-championship",
+  "version": "1.0.0",
+  "description": "A 2D co-op soccer/anime goal defense game",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx vite",
+    "server": "node server.js",
+    "dev": "concurrently \"npm run server\" \"npm run start\"",
+    "build": "npx vite build",
+    "preview": "npx vite preview"
+  },
+  "keywords": ["game", "phaser", "soccer", "anime", "co-op"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "socket.io": "^4.7.2",
+    "socket.io-client": "^4.7.2",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "concurrently": "^8.2.2"
+  }
+}
