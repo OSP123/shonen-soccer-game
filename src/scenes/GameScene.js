@@ -174,6 +174,94 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        // Handle remote player shooting (show ball on our screen)
+        this.socket.on('remotePlayerShoot', (shootData) => {
+            const remote = this.remotePlayers[shootData.id];
+            if (remote && remote.player && remote.player.shootRemote) {
+                remote.player.shootRemote(shootData.x, shootData.y);
+            }
+        });
+
+        // Handle remote player blocking (show shield on our screen)
+        this.socket.on('remotePlayerBlock', (blockData) => {
+            const remote = this.remotePlayers[blockData.id];
+            if (remote && remote.player) {
+                if (blockData.blocking) {
+                    remote.player.startBlockRemote();
+                } else {
+                    remote.player.endBlockRemote();
+                }
+            }
+        });
+
+        // Handle remote enemy spawn (keeper receives from striker host)
+        this.socket.on('remoteSpawnEnemy', (enemyData) => {
+            this.spawnEnemyAt(enemyData.x, enemyData.y, enemyData.type, enemyData.enemyId);
+        });
+
+        // Handle remote enemy killed
+        this.socket.on('remoteEnemyKilled', (killData) => {
+            const enemy = this.enemyList.find(e => e.syncId === killData.enemyId);
+            if (enemy) {
+                enemy.takeDamage(999); // Force kill
+                this.enemyList = this.enemyList.filter(e => e !== enemy);
+                this.enemiesKilled++;
+            }
+        });
+
+        // Handle remote shrine damage
+        this.socket.on('remoteShrineDamaged', (damageData) => {
+            this.shrineHealth = Math.max(0, this.shrineHealth - damageData.amount);
+            this.shrineHealthText.setText(`SHRINE: ${this.shrineHealth}%`);
+            this.cameras.main.shake(200, 0.01);
+            if (this.shrineHealth <= 0) {
+                this.gameOver();
+            }
+        });
+
+        // Handle remote score update
+        this.socket.on('remoteScoreUpdate', (scoreData) => {
+            this.score = scoreData.score;
+            this.scoreText.setText(`SCORE: ${this.score}`);
+            this.updateHarmonyMeter(scoreData.harmony);
+        });
+
+        // Handle remote wave sync
+        this.socket.on('remoteWaveSync', (waveData) => {
+            if (waveData.action === 'start') {
+                this.currentWave = waveData.wave;
+                this.waveInProgress = true;
+                this.enemiesSpawned = 0;
+                this.enemiesKilled = 0;
+                // Show wave announcement
+                const waveText = this.add.text(
+                    this.cameras.main.width / 2,
+                    this.cameras.main.height / 2,
+                    `WAVE ${this.currentWave}`,
+                    { font: 'bold 48px Arial', fill: '#ff0000', stroke: '#000000', strokeThickness: 6 }
+                );
+                waveText.setOrigin(0.5);
+                this.tweens.add({
+                    targets: waveText, scaleX: 1.5, scaleY: 1.5, alpha: 0,
+                    duration: 2000, onComplete: () => waveText.destroy()
+                });
+            } else if (waveData.action === 'complete') {
+                this.waveInProgress = false;
+                const bonus = waveData.bonus;
+                const completeText = this.add.text(
+                    this.cameras.main.width / 2,
+                    this.cameras.main.height / 2,
+                    `WAVE ${this.currentWave} COMPLETE!\n+${bonus} BONUS`,
+                    { font: 'bold 36px Arial', fill: '#00ff00', stroke: '#000000', strokeThickness: 5, align: 'center' }
+                );
+                completeText.setOrigin(0.5);
+                this.tweens.add({
+                    targets: completeText, alpha: 0, y: completeText.y - 50,
+                    duration: 3000, onComplete: () => completeText.destroy()
+                });
+            }
+        });
+
         // Handle player disconnect
         this.socket.on('playerDisconnected', (playerId) => {
             if (this.remotePlayers[playerId]) {
@@ -238,7 +326,7 @@ export default class GameScene extends Phaser.Scene {
             enemy && enemy.container && enemy.container.active
         );
 
-        // Setup collision detection if striker exists
+        // Collision: local striker's projectiles vs enemies
         if (this.myPlayer && this.myRole === 'striker' && this.myPlayer.projectiles) {
             this.physics.overlap(
                 this.myPlayer.projectiles,
@@ -249,7 +337,20 @@ export default class GameScene extends Phaser.Scene {
             );
         }
 
-        // Check if keeper is blocking and hitting enemies
+        // Collision: remote striker's projectiles vs enemies (so keeper sees hits too)
+        Object.values(this.remotePlayers).forEach(remote => {
+            if (remote.playerType === 'striker' && remote.player && remote.player.projectiles) {
+                this.physics.overlap(
+                    remote.player.projectiles,
+                    this.enemies,
+                    this.hitEnemy,
+                    null,
+                    this
+                );
+            }
+        });
+
+        // Collision: local keeper blocking vs enemies
         if (this.myPlayer && this.myRole === 'keeper' && this.myPlayer.isBlocking) {
             this.physics.overlap(
                 this.myPlayer.container,
@@ -260,8 +361,8 @@ export default class GameScene extends Phaser.Scene {
             );
         }
 
-        // Check if wave is complete
-        if (this.waveInProgress && this.enemyList.length === 0 && this.enemiesSpawned > 0) {
+        // Wave completion check (host only)
+        if (this.isHost() && this.waveInProgress && this.enemyList.length === 0 && this.enemiesSpawned > 0) {
             this.completeWave();
         }
     }
@@ -414,6 +515,11 @@ export default class GameScene extends Phaser.Scene {
         this.shrineHealth = Math.max(0, this.shrineHealth);
         this.shrineHealthText.setText(`SHRINE: ${this.shrineHealth}%`);
 
+        // Sync shrine damage to other player
+        if (this.socket) {
+            this.socket.emit('shrineDamaged', { amount });
+        }
+
         // Screen shake on damage
         this.cameras.main.shake(200, 0.01);
 
@@ -427,14 +533,22 @@ export default class GameScene extends Phaser.Scene {
         this.scoreText.setText(`SCORE: ${this.score}`);
     }
 
+    // Host check: striker is the host who controls waves/spawning
+    isHost() {
+        return this.myRole === 'striker';
+    }
+
     checkStartGame() {
         if (this.playersConnected >= 2 && !this.gameStarted) {
             this.gameStarted = true;
             console.log('🎮 Both players ready! Starting game in 2 seconds...');
 
-            this.time.delayedCall(2000, () => {
-                this.startNextWave();
-            });
+            // Only the host (striker) starts waves
+            if (this.isHost()) {
+                this.time.delayedCall(2000, () => {
+                    this.startNextWave();
+                });
+            }
         }
     }
 
@@ -448,6 +562,12 @@ export default class GameScene extends Phaser.Scene {
         this.waveInProgress = true;
         this.enemiesSpawned = 0;
         this.enemiesKilled = 0;
+        this.enemyIdCounter = (this.enemyIdCounter || 0);
+
+        // Sync wave start to other player
+        if (this.socket) {
+            this.socket.emit('waveSync', { action: 'start', wave: this.currentWave });
+        }
 
         // Wave announcement
         const waveText = this.add.text(
@@ -476,7 +596,7 @@ export default class GameScene extends Phaser.Scene {
         const enemiesToSpawn = calculateWaveEnemies(this.currentWave);
         const spawnInterval = calculateSpawnInterval(this.currentWave);
 
-        // Spawn enemies over time
+        // Spawn enemies over time (host only)
         let spawned = 0;
         this.waveTimer = this.time.addEvent({
             delay: spawnInterval,
@@ -496,16 +616,24 @@ export default class GameScene extends Phaser.Scene {
     spawnEnemy() {
         const width = this.cameras.main.width;
         const x = Phaser.Math.Between(100, width - 100);
-        const y = 150; // Spawn ON screen for visibility testing
-
-        // Determine enemy type based on wave
+        const y = -50; // Spawn above screen
         const type = selectEnemyType(this.currentWave);
+        const enemyId = `e-${++this.enemyIdCounter}-${Date.now()}`;
 
-        console.log(`👾 Spawning ${type} enemy at (${x}, ${y})`);
+        // Sync spawn to other player
+        if (this.socket) {
+            this.socket.emit('spawnEnemy', { x, y, type, enemyId });
+        }
+
+        this.spawnEnemyAt(x, y, type, enemyId);
+    }
+
+    // Shared spawn logic used by both host and remote
+    spawnEnemyAt(x, y, type, enemyId) {
         const enemy = new Enemy(this, x, y, type);
+        enemy.syncId = enemyId;
         this.enemyList.push(enemy);
         this.enemies.add(enemy.getContainer());
-        console.log(`👾 Enemy spawned! Total enemies: ${this.enemyList.length}`);
     }
 
     completeWave() {
@@ -518,6 +646,12 @@ export default class GameScene extends Phaser.Scene {
         // Wave complete bonus
         const bonus = calculateWaveBonus(this.currentWave);
         this.addScore(bonus);
+
+        // Sync wave complete and score to other player
+        if (this.socket) {
+            this.socket.emit('waveSync', { action: 'complete', wave: this.currentWave, bonus });
+            this.socket.emit('scoreUpdate', { score: this.score, harmony: this.harmonyMeter });
+        }
 
         // Show wave complete message
         const completeText = this.add.text(
@@ -542,16 +676,17 @@ export default class GameScene extends Phaser.Scene {
             onComplete: () => completeText.destroy()
         });
 
-        // Start next wave after delay
-        this.time.delayedCall(4000, () => {
-            this.startNextWave();
-        });
+        // Start next wave after delay (host only)
+        if (this.isHost()) {
+            this.time.delayedCall(4000, () => {
+                this.startNextWave();
+            });
+        }
 
         console.log(`✅ Wave ${this.currentWave} complete! Starting next wave soon...`);
     }
 
     hitEnemy(projectile, enemyContainer) {
-        // Find the enemy instance
         const enemy = this.enemyList.find(e => e.container === enemyContainer);
 
         if (enemy) {
@@ -561,49 +696,49 @@ export default class GameScene extends Phaser.Scene {
                 this.addScore(enemy.stats.points);
                 this.enemiesKilled++;
                 this.updateHarmonyMeter(this.harmonyMeter + 5);
-
-                // Remove from enemies list
                 this.enemyList = this.enemyList.filter(e => e !== enemy);
+
+                // Sync kill and score to other player
+                if (this.socket) {
+                    this.socket.emit('enemyKilled', { enemyId: enemy.syncId });
+                    this.socket.emit('scoreUpdate', { score: this.score, harmony: this.harmonyMeter });
+                }
             }
 
-            // Destroy the projectile
             projectile.destroy();
         }
     }
 
     blockEnemy(keeperContainer, enemyContainer) {
-        // Find the enemy instance
         const enemy = this.enemyList.find(e => e.container === enemyContainer);
 
         if (enemy) {
             const destroyed = enemy.takeDamage(1);
 
             if (destroyed) {
-                this.addScore(calculateBlockScore(enemy.stats.points)); // Bonus for blocking
+                this.addScore(calculateBlockScore(enemy.stats.points));
                 this.enemiesKilled++;
                 this.updateHarmonyMeter(this.harmonyMeter + 10);
-
-                // Remove from enemies list
                 this.enemyList = this.enemyList.filter(e => e !== enemy);
+
+                // Sync kill and score to other player
+                if (this.socket) {
+                    this.socket.emit('enemyKilled', { enemyId: enemy.syncId });
+                    this.socket.emit('scoreUpdate', { score: this.score, harmony: this.harmonyMeter });
+                }
 
                 // Visual feedback
                 const blockText = this.add.text(
                     keeperContainer.x,
                     keeperContainer.y - 30,
                     'BLOCKED!',
-                    {
-                        font: 'bold 16px Arial',
-                        fill: '#00bcd4'
-                    }
+                    { font: 'bold 16px Arial', fill: '#00bcd4' }
                 );
                 blockText.setOrigin(0.5);
-
                 this.tweens.add({
                     targets: blockText,
-                    y: blockText.y - 30,
-                    alpha: 0,
-                    duration: 1000,
-                    onComplete: () => blockText.destroy()
+                    y: blockText.y - 30, alpha: 0,
+                    duration: 1000, onComplete: () => blockText.destroy()
                 });
             }
         }

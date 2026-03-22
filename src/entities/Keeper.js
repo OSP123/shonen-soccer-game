@@ -178,6 +178,11 @@ export default class Keeper {
         // Slow movement while blocking
         this.speed = 100;
 
+        // Emit block event for multiplayer sync
+        if (this.scene.socket && !this.isRemote) {
+            this.scene.socket.emit('playerBlock', { blocking: true });
+        }
+
         // End block after duration
         this.scene.time.delayedCall(this.blockDuration, () => {
             this.endBlock();
@@ -199,9 +204,33 @@ export default class Keeper {
         // Restore movement speed
         this.speed = 220;
 
+        // Emit block end for multiplayer sync
+        if (this.scene.socket && !this.isRemote) {
+            this.scene.socket.emit('playerBlock', { blocking: false });
+        }
+
         // Start cooldown
         this.scene.time.delayedCall(this.blockCooldown, () => {
             this.canBlock = true;
+        });
+    }
+
+    // Trigger block visuals from remote event
+    startBlockRemote() {
+        this.isBlocking = true;
+        this.scene.tweens.add({
+            targets: this.shield,
+            alpha: 0.8, scaleX: 1.5, scaleY: 1.5,
+            duration: 100
+        });
+    }
+
+    endBlockRemote() {
+        this.isBlocking = false;
+        this.scene.tweens.add({
+            targets: this.shield,
+            alpha: 0, scaleX: 1, scaleY: 1,
+            duration: 200
         });
     }
 

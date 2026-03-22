@@ -85,6 +85,31 @@ function createServer() {
         });
     });
 
+    // Handle enemy spawn (host broadcasts to other players)
+    socket.on('spawnEnemy', (enemyData) => {
+        socket.broadcast.emit('remoteSpawnEnemy', enemyData);
+    });
+
+    // Handle enemy killed (sync kill across players)
+    socket.on('enemyKilled', (killData) => {
+        socket.broadcast.emit('remoteEnemyKilled', killData);
+    });
+
+    // Handle shrine damage (sync across players)
+    socket.on('shrineDamaged', (damageData) => {
+        socket.broadcast.emit('remoteShrineDamaged', damageData);
+    });
+
+    // Handle score update (sync across players)
+    socket.on('scoreUpdate', (scoreData) => {
+        socket.broadcast.emit('remoteScoreUpdate', scoreData);
+    });
+
+    // Handle wave sync (host tells other players about wave changes)
+    socket.on('waveSync', (waveData) => {
+        socket.broadcast.emit('remoteWaveSync', waveData);
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log(`❌ Player disconnected: ${socket.id}`);

@@ -193,12 +193,41 @@ export default class Striker {
             this.canShoot = true;
         });
 
+        // Emit shoot event for multiplayer sync
+        if (this.scene.socket) {
+            this.scene.socket.emit('playerShoot', { x: worldX, y: worldY });
+        }
+
         // Visual feedback
         this.aura.setAlpha(0.5);
         this.scene.tweens.add({
             targets: this.aura,
             alpha: 0.2,
             duration: 200
+        });
+    }
+
+    // Create a visual-only ball for remote player's shoot (seen by other players)
+    shootRemote(x, y) {
+        if (!this.scene.textures.exists('ball')) {
+            const graphics = this.scene.add.graphics();
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillCircle(12, 12, 12);
+            graphics.lineStyle(2, 0xff6b6b, 1);
+            graphics.strokeCircle(12, 12, 12);
+            graphics.generateTexture('ball', 24, 24);
+            graphics.destroy();
+        }
+
+        const ball = this.scene.physics.add.sprite(x, y - 20, 'ball');
+        ball.setDepth(100);
+        this.projectiles.add(ball);
+        ball.body.setAllowGravity(false);
+        ball.body.setCollideWorldBounds(false);
+        ball.body.setVelocity(0, -500);
+
+        this.scene.time.delayedCall(2000, () => {
+            if (ball && ball.active) { ball.destroy(); }
         });
     }
 
