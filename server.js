@@ -1,24 +1,27 @@
 // Multiplayer server for Spirit Stadium Championship
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const socketIo = require('socket.io');
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+function createServer() {
+    const app = express();
+    const server = http.createServer(app);
 
-const PORT = process.env.PORT || 3000;
+    // Serve the built Vite client from dist/
+    app.use(express.static(path.join(__dirname, 'dist')));
+    const io = socketIo(server, {
+        cors: {
+            origin: "*",
+            methods: ["GET", "POST"]
+        }
+    });
 
-// Game state
-const players = {};
-let playerCount = 0;
+    // Game state
+    const players = {};
+    let playerCount = 0;
 
-io.on('connection', (socket) => {
+    io.on('connection', (socket) => {
     console.log(`✅ Player connected: ${socket.id}`);
 
     // Auto-assign player role based on connection order
@@ -91,7 +94,17 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`🎮 Spirit Stadium Championship Server running on port ${PORT}`);
-    console.log(`🌐 Multiplayer ready! Players can connect from multiple browsers.`);
-});
+    return { app, server, io, getState: () => ({ players, playerCount }) };
+}
+
+// Only start listening if this file is run directly
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    const { server } = createServer();
+    server.listen(PORT, () => {
+        console.log(`🎮 Spirit Stadium Championship Server running on port ${PORT}`);
+        console.log(`🌐 Multiplayer ready! Players can connect from multiple browsers.`);
+    });
+}
+
+module.exports = { createServer };

@@ -29,6 +29,9 @@ export default class Keeper {
         this.container.body.setSize(40, 60);
         this.container.body.setOffset(-20, -35);
 
+        // Set depth to be visible
+        this.container.setDepth(75);
+
         // Movement properties
         this.speed = 220;
 

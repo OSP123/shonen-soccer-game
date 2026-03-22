@@ -29,6 +29,9 @@ export default class Striker {
         this.container.body.setSize(40, 60);
         this.container.body.setOffset(-20, -35);
 
+        // Set depth to be visible
+        this.container.setDepth(75);
+
         // Movement properties
         this.speed = 250;
 
@@ -126,6 +129,7 @@ export default class Striker {
 
             // Shooting
             if (this.cursors.shoot.isDown && this.canShoot) {
+                console.log('🎯 Striker shooting!');
                 this.shoot();
             }
 
@@ -149,28 +153,38 @@ export default class Striker {
     shoot() {
         this.canShoot = false;
 
-        // Create a soccer ball projectile
-        const ball = this.scene.add.circle(
-            this.container.x,
-            this.container.y - 20,
-            8,
-            0xffffff
-        );
+        // Get the current world position of the striker
+        const worldX = this.container.x;
+        const worldY = this.container.y;
 
-        this.scene.physics.add.existing(ball);
+        // Create ball texture if it doesn't exist
+        if (!this.scene.textures.exists('ball')) {
+            const graphics = this.scene.add.graphics();
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillCircle(12, 12, 12);
+            graphics.lineStyle(2, 0xff6b6b, 1);
+            graphics.strokeCircle(12, 12, 12);
+            graphics.generateTexture('ball', 24, 24);
+            graphics.destroy();
+        }
 
-        // Shoot upward toward shrine
-        ball.body.setVelocity(0, -500);
+        // Create ball as a physics sprite
+        const ball = this.scene.physics.add.sprite(worldX, worldY - 20, 'ball');
+        ball.setDepth(100);
 
+        // Add to group FIRST, then configure physics (group.add resets body config)
         this.projectiles.add(ball);
 
-        // Add trail effect
-        this.scene.tweens.add({
-            targets: ball,
-            alpha: 0,
-            duration: 1000,
-            onComplete: () => {
+        // Configure physics AFTER adding to group so settings stick
+        ball.body.setAllowGravity(false);
+        ball.body.setCollideWorldBounds(false);
+        ball.body.setVelocity(0, -500);
+
+        // Auto-destroy ball after it travels off screen
+        this.scene.time.delayedCall(2000, () => {
+            if (ball && ball.active) {
                 ball.destroy();
+                console.log('⚽ Ball destroyed');
             }
         });
 
