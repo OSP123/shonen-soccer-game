@@ -2,7 +2,7 @@
   "name": "spirit-stadium-championship",
   "version": "1.0.0",
   "description": "A 2D co-op soccer/anime goal defense game",
-  "main": "index.html",
+  "main": "server.js",
   "scripts": {
     "start": "npx vite",
     "server": "node server.js",
