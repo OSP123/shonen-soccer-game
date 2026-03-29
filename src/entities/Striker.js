@@ -50,8 +50,8 @@ export default class Striker {
             });
         }
 
-        // Projectiles group
-        this.projectiles = scene.physics.add.group();
+        // Projectiles group (regular group - NOT physics group, to avoid resetting ball body config)
+        this.projectiles = scene.add.group();
 
         // Aura effect
         this.aura = scene.add.circle(0, 0, 35, 0xff6b6b, 0.2);
@@ -171,14 +171,10 @@ export default class Striker {
         // Create ball as a physics sprite
         const ball = this.scene.physics.add.sprite(worldX, worldY - 20, 'ball');
         ball.setDepth(100);
-
-        // Add to group FIRST, then configure physics (group.add resets body config)
-        this.projectiles.add(ball);
-
-        // Configure physics AFTER adding to group so settings stick
         ball.body.setAllowGravity(false);
         ball.body.setCollideWorldBounds(false);
         ball.body.setVelocity(0, -500);
+        this.projectiles.add(ball);
 
         // Auto-destroy ball after it travels off screen
         this.scene.time.delayedCall(2000, () => {

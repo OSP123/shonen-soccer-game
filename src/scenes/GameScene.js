@@ -43,8 +43,8 @@ export default class GameScene extends Phaser.Scene {
         this.score = 0;
         this.harmonyMeter = 0;
 
-        // Enemies group
-        this.enemies = this.physics.add.group();
+        // Enemies group (regular group - NOT physics group, to avoid resetting enemy body config)
+        this.enemies = this.add.group();
         this.enemyList = []; // Track individual enemy instances
 
         // Wave system
@@ -92,6 +92,18 @@ export default class GameScene extends Phaser.Scene {
                 if (!data || !data.players || !data.yourId || !data.yourRole) {
                     throw new Error('Invalid player data received from server');
                 }
+
+                // Clean up existing players before recreating (prevents duplicates on reconnect)
+                if (this.myPlayer) {
+                    this.myPlayer.destroy();
+                    this.myPlayer = null;
+                }
+                Object.keys(this.remotePlayers).forEach(id => {
+                    if (this.remotePlayers[id] && this.remotePlayers[id].player) {
+                        this.remotePlayers[id].player.destroy();
+                    }
+                });
+                this.remotePlayers = {};
 
                 // Create our local player based on assigned role
                 this.myRole = data.yourRole;
@@ -641,10 +653,7 @@ export default class GameScene extends Phaser.Scene {
         const enemy = new Enemy(this, x, y, type);
         enemy.syncId = enemyId;
         this.enemyList.push(enemy);
-
-        // Add to group FIRST, then re-set velocity (group.add resets body config)
         this.enemies.add(enemy.getContainer());
-        enemy.getContainer().body.setVelocity(0, enemy.stats.speed);
     }
 
     completeWave() {
