@@ -24,12 +24,22 @@ function createServer() {
     io.on('connection', (socket) => {
     console.log(`✅ Player connected: ${socket.id}`);
 
-    // Auto-assign player role based on connection order
-    // Player 1 = Striker, Player 2 = Keeper
-    playerCount++;
-    const playerRole = playerCount % 2 === 1 ? 'striker' : 'keeper';
+    // Reject if server is full (max 2 players)
+    const currentPlayerCount = Object.keys(players).length;
+    if (currentPlayerCount >= 2) {
+        console.log(`❌ Server full, rejecting: ${socket.id}`);
+        socket.emit('serverFull', { message: 'Game is full. Only 2 players allowed.' });
+        socket.disconnect(true);
+        return;
+    }
+
+    // Assign role based on what's available
+    const existingRoles = Object.values(players).map(p => p.playerType);
+    const playerRole = existingRoles.includes('striker') ? 'keeper' : 'striker';
     const startX = playerRole === 'striker' ? 540 : 740;
     const startY = 600;
+
+    playerCount++;
 
     // Initialize new player
     players[socket.id] = {

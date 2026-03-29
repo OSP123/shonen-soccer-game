@@ -75,6 +75,14 @@ export default class GameScene extends Phaser.Scene {
             console.log('🌐 Connected to multiplayer server!');
         });
 
+        // Handle server full (max 2 players)
+        this.socket.on('serverFull', (data) => {
+            if (this.debugText) {
+                this.debugText.setText('GAME IS FULL\nOnly 2 players allowed.');
+                this.debugText.setFill('#ff0000');
+            }
+        });
+
         // Handle current players (when joining)
         this.socket.on('currentPlayers', (data) => {
             console.log('📥 Received player data:', data);
@@ -633,7 +641,10 @@ export default class GameScene extends Phaser.Scene {
         const enemy = new Enemy(this, x, y, type);
         enemy.syncId = enemyId;
         this.enemyList.push(enemy);
+
+        // Add to group FIRST, then re-set velocity (group.add resets body config)
         this.enemies.add(enemy.getContainer());
+        enemy.getContainer().body.setVelocity(0, enemy.stats.speed);
     }
 
     completeWave() {
