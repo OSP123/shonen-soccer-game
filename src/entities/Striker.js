@@ -66,6 +66,22 @@ export default class Striker {
             repeat: -1
         });
 
+        // Health system
+        this.health = 100;
+        this.maxHealth = 100;
+        this.isInvincible = false;
+
+        // Health bar (above label)
+        this.healthBarBg = scene.add.graphics();
+        this.healthBarBg.fillStyle(0x330000, 0.8);
+        this.healthBarBg.fillRect(-20, -65, 40, 5);
+        this.container.add(this.healthBarBg);
+
+        this.healthBarFg = scene.add.graphics();
+        this.healthBarFg.fillStyle(0x00ff00, 1);
+        this.healthBarFg.fillRect(-20, -65, 40, 5);
+        this.container.add(this.healthBarFg);
+
         // Label
         this.label = scene.add.text(0, -50, isRemote ? 'STRIKER P2' : 'STRIKER P1', {
             font: 'bold 14px Arial',
@@ -225,6 +241,57 @@ export default class Striker {
         this.scene.time.delayedCall(2000, () => {
             if (ball && ball.active) { ball.destroy(); }
         });
+    }
+
+    takeDamage(amount) {
+        if (this.isInvincible) return false;
+
+        this.health = Math.max(0, this.health - amount);
+        this.updateHealthBar();
+
+        // Flash effect
+        this.isInvincible = true;
+        this.scene.tweens.add({
+            targets: this.sprite,
+            alpha: 0.3,
+            duration: 100,
+            yoyo: true,
+            repeat: 5,
+            onComplete: () => {
+                if (this.sprite && this.sprite.active) this.sprite.setAlpha(1);
+            }
+        });
+
+        // End invincibility after 1 second
+        this.scene.time.delayedCall(1000, () => {
+            this.isInvincible = false;
+        });
+
+        return this.health <= 0;
+    }
+
+    setHealth(value) {
+        this.health = Math.max(0, value);
+        this.updateHealthBar();
+    }
+
+    updateHealthBar() {
+        this.healthBarFg.clear();
+        const ratio = this.health / this.maxHealth;
+        let color = 0x00ff00;
+        if (ratio < 0.3) color = 0xff0000;
+        else if (ratio < 0.6) color = 0xffaa00;
+        this.healthBarFg.fillStyle(color, 1);
+        this.healthBarFg.fillRect(-20, -65, 40 * ratio, 5);
+    }
+
+    respawn(x, y) {
+        this.health = this.maxHealth;
+        this.updateHealthBar();
+        this.container.x = x;
+        this.container.y = y;
+        this.isInvincible = false;
+        this.sprite.setAlpha(1);
     }
 
     destroy() {

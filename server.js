@@ -115,6 +115,11 @@ function createServer() {
         socket.broadcast.emit('remoteScoreUpdate', scoreData);
     });
 
+    // Handle player damage (sync health bars across players)
+    socket.on('playerDamaged', (data) => {
+        socket.broadcast.emit('remotePlayerDamaged', { id: socket.id, ...data });
+    });
+
     // Handle wave sync (host tells other players about wave changes)
     socket.on('waveSync', (waveData) => {
         socket.broadcast.emit('remoteWaveSync', waveData);

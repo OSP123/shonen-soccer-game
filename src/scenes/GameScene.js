@@ -282,6 +282,14 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        // Handle remote player damage (update their health bar)
+        this.socket.on('remotePlayerDamaged', (data) => {
+            const remote = this.remotePlayers[data.id];
+            if (remote && remote.player && remote.player.setHealth) {
+                remote.player.setHealth(data.health);
+            }
+        });
+
         // Handle player disconnect
         this.socket.on('playerDisconnected', (playerId) => {
             if (this.remotePlayers[playerId]) {
@@ -376,6 +384,17 @@ export default class GameScene extends Phaser.Scene {
                 this.myPlayer.container,
                 this.enemies,
                 this.blockEnemy,
+                null,
+                this
+            );
+        }
+
+        // Collision: enemies vs local player (damage on contact)
+        if (this.myPlayer && !this.myPlayer.isInvincible) {
+            this.physics.overlap(
+                this.myPlayer.container,
+                this.enemies,
+                this.enemyHitPlayer,
                 null,
                 this
             );
@@ -762,5 +781,66 @@ export default class GameScene extends Phaser.Scene {
                 });
             }
         }
+    }
+
+    enemyHitPlayer(playerContainer, enemyContainer) {
+        if (this.myPlayer.isInvincible) return;
+
+        const enemy = this.enemyList.find(e => e.container === enemyContainer);
+        if (!enemy) return;
+
+        const isDead = this.myPlayer.takeDamage(enemy.stats.damage);
+
+        // Destroy the enemy on contact
+        enemy.takeDamage(999);
+        this.enemyList = this.enemyList.filter(e => e !== enemy);
+        this.enemiesKilled++;
+
+        // Sync damage and enemy kill to other player
+        if (this.socket) {
+            this.socket.emit('playerDamaged', { health: this.myPlayer.health });
+            this.socket.emit('enemyKilled', { enemyId: enemy.syncId });
+        }
+
+        // Camera shake on hit
+        this.cameras.main.shake(200, 0.01);
+
+        if (isDead) {
+            this.playerDeath();
+        }
+    }
+
+    playerDeath() {
+        // Show death text
+        const deathText = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            'YOU DIED!',
+            { font: 'bold 48px Arial', fill: '#ff0000', stroke: '#000000', strokeThickness: 6 }
+        );
+        deathText.setOrigin(0.5);
+        deathText.setDepth(2000);
+
+        this.cameras.main.shake(500, 0.03);
+
+        // Hide player temporarily
+        this.myPlayer.container.setVisible(false);
+        this.myPlayer.container.body.enable = false;
+
+        // Respawn after 3 seconds
+        this.time.delayedCall(3000, () => {
+            if (this.myPlayer) {
+                const startX = this.myRole === 'striker' ? 540 : 740;
+                this.myPlayer.respawn(startX, 600);
+                this.myPlayer.container.setVisible(true);
+                this.myPlayer.container.body.enable = true;
+
+                // Sync respawn health to other player
+                if (this.socket) {
+                    this.socket.emit('playerDamaged', { health: this.myPlayer.health });
+                }
+            }
+            deathText.destroy();
+        });
     }
 }
