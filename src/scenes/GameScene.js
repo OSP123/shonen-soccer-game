@@ -319,9 +319,9 @@ export default class GameScene extends Phaser.Scene {
             // Create appropriate player type based on their selection
             let player;
             if (playerInfo.playerType === 'striker') {
-                player = new Striker(this, playerInfo.x || 540, playerInfo.y || 600, true);
+                player = new Striker(this, playerInfo.x || 300, playerInfo.y || 360, true);
             } else if (playerInfo.playerType === 'keeper') {
-                player = new Keeper(this, playerInfo.x || 740, playerInfo.y || 600, true);
+                player = new Keeper(this, playerInfo.x || 200, playerInfo.y || 360, true);
             }
 
             if (player) {
@@ -435,15 +435,17 @@ export default class GameScene extends Phaser.Scene {
         graphics.lineStyle(2, 0x00ff00, 0.3);
         graphics.strokeCircle(width / 2, height / 2, 80);
 
-        // Center line
-        graphics.lineBetween(50, height / 2, width - 50, height / 2);
+        // Center line (vertical)
+        graphics.lineBetween(width / 2, 50, width / 2, height - 50);
     }
 
     createShrine() {
         const width = this.cameras.main.width;
 
-        // Shrine base (large glowing crystal at TOP of screen)
-        this.shrine = this.add.container(width / 2, 100);
+        const height = this.cameras.main.height;
+
+        // Shrine base (large glowing crystal on LEFT side of screen)
+        this.shrine = this.add.container(100, height / 2);
 
         // Outer glow - MUCH BIGGER and more visible
         const glow = this.add.circle(0, 0, 80, 0x9c27b0, 0.5);
@@ -653,9 +655,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     spawnEnemy() {
-        const width = this.cameras.main.width;
-        const x = Phaser.Math.Between(100, width - 100);
-        const y = -50; // Spawn above screen
+        const height = this.cameras.main.height;
+        const x = this.cameras.main.width + 50; // Spawn off right edge
+        const y = Phaser.Math.Between(100, height - 100);
         const type = selectEnemyType(this.currentWave);
         const enemyId = `e-${++this.enemyIdCounter}-${Date.now()}`;
 
@@ -830,8 +832,8 @@ export default class GameScene extends Phaser.Scene {
         // Respawn after 3 seconds
         this.time.delayedCall(3000, () => {
             if (this.myPlayer) {
-                const startX = this.myRole === 'striker' ? 540 : 740;
-                this.myPlayer.respawn(startX, 600);
+                const startX = this.myRole === 'striker' ? 300 : 200;
+                this.myPlayer.respawn(startX, 360);
                 this.myPlayer.container.setVisible(true);
                 this.myPlayer.container.body.enable = true;
 

@@ -185,11 +185,11 @@ export default class Striker {
         }
 
         // Create ball as a physics sprite
-        const ball = this.scene.physics.add.sprite(worldX, worldY - 20, 'ball');
+        const ball = this.scene.physics.add.sprite(worldX + 20, worldY, 'ball');
         ball.setDepth(100);
         ball.body.setAllowGravity(false);
         ball.body.setCollideWorldBounds(false);
-        ball.body.setVelocity(0, -500);
+        ball.body.setVelocity(500, 0);
         this.projectiles.add(ball);
 
         // Auto-destroy ball after it travels off screen
@@ -231,12 +231,12 @@ export default class Striker {
             graphics.destroy();
         }
 
-        const ball = this.scene.physics.add.sprite(x, y - 20, 'ball');
+        const ball = this.scene.physics.add.sprite(x + 20, y, 'ball');
         ball.setDepth(100);
         this.projectiles.add(ball);
         ball.body.setAllowGravity(false);
         ball.body.setCollideWorldBounds(false);
-        ball.body.setVelocity(0, -500);
+        ball.body.setVelocity(500, 0);
 
         this.scene.time.delayedCall(2000, () => {
             if (ball && ball.active) { ball.destroy(); }

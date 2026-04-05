@@ -30,7 +30,7 @@ export default class Enemy {
         // Physics
         scene.physics.add.existing(this.container);
         this.container.body.setSize(this.stats.size, this.stats.size);
-        this.container.body.setVelocity(0, this.stats.speed);
+        this.container.body.setVelocity(-this.stats.speed, 0);
 
         // Dark aura effect
         this.aura = scene.add.circle(0, 0, this.stats.size + 10, this.stats.color, 0.3);
@@ -134,8 +134,8 @@ export default class Enemy {
     }
 
     update() {
-        // Check if enemy reached the shrine (bottom of screen)
-        if (this.container.y > this.scene.cameras.main.height - 100) {
+        // Check if enemy reached the shrine (left side of screen)
+        if (this.container.x < 150) {
             this.scene.damageShrine(this.stats.damage);
             this.destroy();
         }

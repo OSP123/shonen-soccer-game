@@ -36,8 +36,8 @@ function createServer() {
     // Assign role based on what's available
     const existingRoles = Object.values(players).map(p => p.playerType);
     const playerRole = existingRoles.includes('striker') ? 'keeper' : 'striker';
-    const startX = playerRole === 'striker' ? 540 : 740;
-    const startY = 600;
+    const startX = playerRole === 'striker' ? 300 : 200;
+    const startY = 360;
 
     playerCount++;
 
