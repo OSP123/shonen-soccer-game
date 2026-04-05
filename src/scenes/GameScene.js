@@ -389,8 +389,8 @@ export default class GameScene extends Phaser.Scene {
             );
         }
 
-        // Collision: enemies vs local player (damage on contact)
-        if (this.myPlayer && !this.myPlayer.isInvincible) {
+        // Collision: enemies vs local player (damage on contact, skip if keeper is blocking)
+        if (this.myPlayer && !this.myPlayer.isInvincible && !this.myPlayer.isBlocking) {
             this.physics.overlap(
                 this.myPlayer.container,
                 this.enemies,
@@ -754,7 +754,7 @@ export default class GameScene extends Phaser.Scene {
         const enemy = this.enemyList.find(e => e.container === enemyContainer);
 
         if (enemy) {
-            const destroyed = enemy.takeDamage(1);
+            const destroyed = enemy.takeDamage(enemy.health);
 
             if (destroyed) {
                 this.addScore(calculateBlockScore(enemy.stats.points));
